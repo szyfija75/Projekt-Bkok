@@ -19,7 +19,7 @@ router.post("/register", async (req, res) => {
 });
 
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body || {};
+  const { email, password, twoFactorCode } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: "email & password required" });
 
   const user = await User.findOne({ email });
@@ -27,6 +27,10 @@ router.post("/login", async (req, res) => {
 
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return res.status(401).json({ error: "bad credentials" });
+
+  if (twoFactorCode !== "123456") {
+    return res.status(401).json({ error: "Nieprawidłowy kod 2FA" });
+  }
 
   const token = jwt.sign({}, process.env.JWT_SECRET, { subject: String(user._id), expiresIn: "2h" });
   return res.json({ token });

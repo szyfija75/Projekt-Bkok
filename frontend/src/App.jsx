@@ -45,7 +45,6 @@ export default function App() {
         setMode("login");
         setMsg("Zarejestrowano. Zaloguj się.");
       } else {
-        // 2. Przesyłamy twoFactorCode do backendu
         const { data } = await api.post("/auth/login", { email, password, twoFactorCode });
         setTok(data.token);
       }
@@ -82,7 +81,7 @@ export default function App() {
   function logout() {
     setTok("");
     setEntries([]);
-    setTwoFactorCode(""); // Czyszczenie kodu
+    setTwoFactorCode(""); 
   }
 
   if (!token) {
@@ -100,8 +99,6 @@ export default function App() {
 
           <label>Hasło</label>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-
-          {/* 3. Dodano pole input dla 2FA widoczne tylko w trybie logowania */}
           {mode === "login" && (
             <>
               <label>Kod 2FA (wpisz 123456)</label>

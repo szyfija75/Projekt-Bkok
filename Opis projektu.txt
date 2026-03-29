@@ -1,0 +1,323 @@
+Wstęp do projektu – “PW Vault (MERN + Docker)”
+Cel projektu
+
+Projekt jest prostą aplikacją typu Password Vault / Password Manager, która pozwala użytkownikowi:
+
+założyć konto i zalogować się,
+
+tworzyć i przeglądać własne wpisy (np. “YouTube”, “Steam”, “Bank”),
+
+przechowywać dane wpisów w bazie MongoDB,
+
+korzystać z API po stronie serwera (backend),
+
+obsługiwać interfejs webowy po stronie klienta (frontend).
+
+To jest wersja “bazowa” – gotowa do uruchomienia, a dalej rozbudowywana w zadaniach (od łatwych do trudnych).
+
+Technologie użyte w projekcie
+Frontend (UI)
+
+Node.js + Vite (dev server)
+
+aplikacja w przeglądarce (SPA)
+
+komunikacja z backendem przez HTTP (fetch/axios – zależnie od wersji)
+
+Port frontendu: 5173
+Po starcie zobaczysz w logach coś w stylu:
+Local: http://localhost:5173/
+
+Backend (API)
+
+Node.js + Express
+
+Mongoose (warstwa komunikacji z MongoDB)
+
+Obsługa logowania / rejestracji oraz endpointów do wpisów vault
+
+Port backendu: 5000
+W logach: Backend listening on :5000
+
+Baza danych
+
+MongoDB uruchamiane w kontenerze Dockera
+
+dane przechowywane jako kolekcje (np. users, entries)
+
+Architektura aplikacji (jak to działa “w skrócie”)
+
+Aplikacja jest w klasycznym układzie:
+
+Frontend (przeglądarka) → wysyła zapytania HTTP → Backend (API Express) → zapis/odczyt → MongoDB
+
+Przykładowy przepływ
+
+Użytkownik loguje się w UI.
+
+Frontend wysyła dane logowania do backendu.
+
+Backend weryfikuje hasło użytkownika (hash w bazie).
+
+Backend zwraca token/sesję (zależnie od implementacji).
+
+Frontend używa tego tokenu/sesji do autoryzacji kolejnych wywołań (np. dodanie wpisu).
+
+Backend zapisuje wpis w MongoDB w kolekcji wpisów użytkownika.
+
+Uruchamianie projektu
+
+Projekt jest uruchamiany w Dockerze, więc uczeń nie musi instalować Mongo, Node i zależności “ręcznie” w systemie.
+
+Typowy start:
+
+docker compose up --build
+
+Potem:
+
+UI: http://localhost:5173
+
+API: http://localhost:5000
+
+Do podglądu logów:
+
+docker compose logs -f
+
+Zatrzymanie:
+
+docker compose down
+
+Struktura katalogów – gdzie czego szukać
+
+Uwaga: nazwy katalogów mogą się minimalnie różnić (np. backend/, server/, api/), ale logika jest ta sama. Poniżej jest “mapa” tego, co zwykle macie w tym projekcie.
+
+Root projektu (katalog główny)
+
+Zwykle zawiera:
+
+docker-compose.yml – najważniejszy plik uruchomieniowy, definiuje 3 serwisy: frontend, backend, mongo
+
+.env lub .env.example – zmienne środowiskowe (sekrety/konfiguracja)
+
+README.md – podstawowy opis (jeśli jest)
+
+katalogi: frontend/ i backend/
+
+docker-compose.yml – co tam jest
+
+W compose masz zwykle 3 kontenery:
+
+pw-frontend – uruchamia Vite na porcie 5173
+
+pw-backend – uruchamia Express na porcie 5000
+
+pw-mongo – MongoDB (port 27017 “wewnątrz sieci dockera”, czasem też wystawiony na hosta)
+
+To jest miejsce, gdzie:
+
+ustawiasz porty,
+
+podajesz zmienne środowiskowe do backendu,
+
+konfigurujesz hasła do Mongo (root user),
+
+ustawiasz wolumen na dane bazy.
+
+Backend – najważniejsze katalogi i pliki
+1) Punkt wejścia serwera
+
+Najczęściej:
+
+backend/server.js lub backend/index.js
+
+Tu zwykle jest:
+
+uruchomienie Expressa,
+
+podłączenie do MongoDB,
+
+rejestracja routerów: auth, vault, itd.
+
+konfiguracja CORS / JSON body parsing.
+
+2) Routing API
+
+Zwykle:
+
+backend/src/routes/
+
+Tam znajdziesz pliki w stylu:
+
+auth.js – rejestracja/logowanie
+
+vault.js – tworzenie/pobieranie/edycja/usuwanie wpisów
+
+To jest kluczowe miejsce dla zadań typu:
+
+rate limiting,
+
+blokada po błędnych logowaniach,
+
+dodatkowe zabezpieczenia endpointów.
+
+3) Modele (Mongoose)
+
+Zwykle:
+
+backend/src/models/ (albo po prostu backend/models/)
+
+To są schematy dokumentów w MongoDB.
+
+W projekcie typowo są co najmniej dwa modele:
+
+User (użytkownik)
+
+Przechowuje m.in.:
+
+email / login
+
+hash hasła (bcrypt)
+
+(opcjonalnie) pola pod 2FA (np. sekret TOTP, czy 2FA włączone)
+
+Entry (wpis vault)
+
+Przechowuje m.in.:
+
+userId (powiązanie z użytkownikiem)
+
+dane wpisu typu: nazwa/tytuł, login, hasło, url, notatka
+
+pola szyfrowane (zależnie od wersji)
+
+W logach Mongo widziałeś tworzenie kolekcji:
+
+pw_vault.users
+
+pw_vault.entries
+
+To potwierdza, że obecne “core” projektu opiera się właśnie na tych dwóch kolekcjach.
+
+4) Utils / szyfrowanie
+
+Zwykle:
+
+backend/src/utils/crypto.js
+
+To miejsce odpowiada za operacje kryptograficzne używane przy wpisach vault.
+
+W Waszej wersji (na podstawie błędu z logów) aplikacja oczekuje zmiennej środowiskowej:
+
+ENC_KEY – klucz do szyfrowania wpisów
+
+Jeśli ENC_KEY ma zły format/długość, backend potrafi się wysypać przy próbie dodania wpisu (to właśnie widzieliście).
+
+5) Middleware (autoryzacja)
+
+Zwykle:
+
+backend/src/middleware/
+
+Często znajduje się tam:
+
+weryfikacja tokenu (np. JWT)
+
+ochrona endpointów (żeby user widział tylko swoje wpisy)
+
+To jest też dobre miejsce do rozbudowy o:
+
+lockout,
+
+licznik nieudanych logowań,
+
+dodatkowe kontrole.
+
+Frontend – gdzie jest “UI” i logika ekranu
+
+Zwykle:
+
+frontend/src/
+
+W środku typowo:
+
+pages/ lub views/ – ekrany (Login, Register, Vault)
+
+components/ – komponenty UI
+
+services/ / api/ – pliki odpowiedzialne za wywołania backendu (fetch/axios)
+
+router/ – routing w aplikacji (jeśli używacie)
+
+App.jsx/tsx – główna aplikacja
+
+Tu będziesz szukać:
+
+formularza logowania i rejestracji,
+
+formularza dodawania wpisu,
+
+listy wpisów,
+
+miejsca, gdzie trzymany jest token/sesja po zalogowaniu.
+
+Baza danych – co jest gdzie
+
+W MongoDB masz bazę (np. pw_vault) i kolekcje:
+
+users
+
+entries
+
+Relacja “user → entries” zwykle jest rozwiązana przez pole:
+
+entries.userId
+
+Czyli wpisy są “przypięte” do użytkownika i backend filtruje je po userId, żeby każdy widział tylko swoje dane.
+
+“Mapa do zadań” – gdzie trzeba grzebać
+
+Poniżej szybka mapa: zadanie → pliki do dotykania.
+
+Ocena 2: Git + .gitignore
+
+w root: .gitignore, README.md, inicjalizacja repozytorium
+
+plus porządek w .env (np. .env.example zamiast wrzucania sekretów)
+
+Ocena 3: 2FA (dwuskładnikowe)
+
+backend: routes/auth.js, model User.js
+
+frontend: ekran logowania + dodatkowy ekran/pole na kod 2FA
+
+(opcjonalnie) dodatkowy endpoint do włączenia/wyłączenia 2FA
+
+Ocena 4: lepsze szyfrowanie (ulepszenie)
+
+backend: utils/crypto.js, routes/vault.js, model Entry.js
+
+logika: co jest szyfrowane, w jakim formacie, jak przechowywane w DB
+
+Ocena 5: Rate limiting + lockout (anty brute-force)
+
+backend: middleware (np. middleware/), routes/auth.js
+
+możliwe: przechowywanie liczników prób (in-memory / Mongo / Redis – zależnie od poziomu)
+
+Ocena 6: “Master password based encryption”
+
+backend i/lub frontend (zależnie od wybranego wariantu)
+
+temat bardziej kryptograficzny: KDF, klucze per-user, AES-GCM, client-side encryption albo key-wrapping
+
+Jak debugować, gdy “coś nie działa”
+
+Najczęstsza praktyka:
+
+Patrz w logi: docker compose logs -f
+
+Jeśli backend się restartuje – najpierw błąd w konsoli backendu (jak u Was z ENC_KEY)
+
+Jeśli frontend nie widzi backendu – sprawdź URL API w froncie i CORS
+
+Jeśli wpisy się nie zapisują – sprawdź endpoint w backendzie i strukturę modelu Entry

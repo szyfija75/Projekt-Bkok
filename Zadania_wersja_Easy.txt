@@ -1,0 +1,289 @@
+Pamiętaj że projekt uruchamiasz poleceniem:
+docker-compose up --build
+
+lub docker compose up --build
+W zależności od wersji silnika dockera.
+
+Aby opuścić projekt należy użyć polecenia:
+docker-compose down
+
+Zadania do projektu “PW Vault” (wersja EASY)
+Jak jest liczona ocena
+
+2.0 – wykonaj Zadanie 1
+
+3.0 – Zadanie 1 + Zadanie 2
+
+4.0 – Zadanie 1 + Zadanie 2 + Zadanie 3
+
+5.0 – Zadanie 1 + Zadanie 2 + Zadanie 3 + Zadanie 4
+
+6.0 – Zadanie 1 + Zadanie 2 + Zadanie 3 + Zadanie 4 + Zadanie 5
+
+Każde zadanie jest niezależne: robisz w dowolnej kolejności i budujesz ocenę.
+
+ZADANIE 1 (na 2.0) – Git + .gitignore + wrzucenie projektu na GitHub/GitLab
+Szkielet (o co chodzi)
+
+Masz przygotować projekt tak, jak robi to realnie specjalista IT:
+
+repozytorium Git,
+
+sensowny .gitignore,
+
+brak wrzucania sekretów (np. .env),
+
+push na zdalne repo (GitHub/GitLab).
+
+Wykonanie (krok po kroku)
+
+Sprawdź, czy masz git
+
+Windows: w PowerShell wpisz:
+
+git --version
+
+Jeśli nie działa: zainstaluj “Git for Windows”.
+
+Zainicjuj repo w katalogu projektu
+W głównym folderze projektu (tam gdzie jest docker-compose.yml):
+
+git init
+
+Dodaj plik .gitignore
+W root projektu utwórz .gitignore i wklej:
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Build
+dist/
+build/
+.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker local volumes (opcjonalnie)
+data/
+mongo-data/
+
+
+Zrób plik .env.example
+
+jeśli masz .env → skopiuj go jako .env.example
+
+w .env.example usuń hasła/sekrety i zostaw placeholdery, np.:
+
+MONGO_URI=mongodb://root:HASLO@pw-mongo:27017/pw_vault?authSource=admin
+JWT_SECRET=TU_WPISZ_SWÓJ_SEKRET
+ENC_KEY=TU_WPISZ_SWÓJ_KLUCZ
+
+
+Commit
+
+git add .
+
+git commit -m "Initial commit"
+
+Wrzucenie na GitHub / GitLab
+
+Załóż repo na GitHubie/GitLabie (puste)
+
+Skopiuj komendy z portalu (zwykle coś jak):
+
+git remote add origin <URL>
+
+git branch -M main
+
+git push -u origin main
+
+✅ Oddanie: link do repo + screen z git log --oneline.
+
+ZADANIE 2 (na 3.0) – “2FA light” (kod SMS/Email na sztywno)
+Szkielet (o co chodzi)
+
+Masz dodać drugą warstwę logowania, ale w najprostszej możliwej wersji:
+
+po zalogowaniu hasłem użytkownik ma wpisać kod 123456
+
+jeśli wpisze zły kod → nie wpuszczamy
+
+To nie jest “prawdziwe 2FA”, ale pokazuje ideę i przepływ.
+
+Wykonanie (krok po kroku)
+Część A: Backend – dodaj prostą weryfikację kodu
+
+Otwórz plik logowania w backendzie (zwykle):
+
+backend/src/routes/auth.js (albo podobny)
+
+Znajdź endpoint logowania, np.:
+
+POST /login
+
+Zrób tak, aby backend wymagał pola twoFactorCode:
+
+jeżeli twoFactorCode !== "123456" → zwróć błąd
+
+Przykład logiki (do wklejenia w endpoint logowania):
+
+po sprawdzeniu hasła dopisz:
+
+const { twoFactorCode } = req.body;
+if (twoFactorCode !== "123456") {
+  return res.status(401).json({ message: "Nieprawidłowy kod 2FA" });
+}
+
+Część B: Frontend – dodaj pole na kod
+
+Otwórz ekran logowania:
+
+frontend/src/.../Login... (np. Login.jsx / Login.vue)
+
+Dodaj input:
+
+“Kod 2FA (wpisz 123456)”
+
+Upewnij się, że w request do backendu leci:
+
+twoFactorCode
+
+✅ Oddanie: screen z logowania (pole kodu) + screen, że z błędnym kodem nie wpuszcza, a z 123456 wpuszcza.
+
+ZADANIE 3 (na 4.0) – “Lepsze szyfrowanie” w wersji EASY = szyfrowanie tylko jednej rzeczy
+Szkielet (o co chodzi)
+
+Wpisy vault mają pola (np. password, note).
+Twoim zadaniem jest zrobić minimalne “lepsze bezpieczeństwo”:
+
+zaszyfruj pole password przed zapisaniem do bazy
+
+odszyfruj je przy odczycie
+
+Wersja EASY: szyfrujesz tylko jedno pole (np. password) i wystarczy, że działa.
+
+Wykonanie (krok po kroku)
+
+Otwórz backend route dla wpisów, np.:
+
+backend/src/routes/vault.js
+
+Znajdź endpoint dodawania wpisu:
+
+POST /entries lub podobny
+
+Tam, gdzie zapisujesz wpis, zrób:
+
+passwordEncrypted = encryptText(password)
+
+do bazy zapisuj password: passwordEncrypted
+
+Znajdź endpoint pobierania wpisów:
+
+GET /entries
+
+Przy zwracaniu danych zrób:
+
+passwordDecrypted = decryptText(entry.password)
+
+zwróć odszyfrowane hasło do frontu
+
+Jeśli projekt już ma utils/crypto.js, to korzystasz z istniejących funkcji encryptText() i decryptText().
+
+✅ Oddanie: screen wpisu przed/po + screen w MongoDB (że w bazie nie jest czysty tekst).
+
+ZADANIE 4 (na 5.0) – Anti-bruteforce EASY = blokada po 5 błędnych logowaniach (na 1 minutę)
+Szkielet (o co chodzi)
+
+Specjalista IT zabezpiecza logowanie przed zgadywaniem haseł:
+
+jak ktoś 5 razy poda złe hasło → blokada na minutę
+
+Wersja EASY: licznik trzymasz w pamięci serwera (prosty obiekt JS).
+
+Wykonanie (krok po kroku)
+
+W backendzie (np. auth.js) dodaj na górze pliku:
+
+const attempts = {}; 
+// attempts[email] = { count: 0, blockedUntil: 0 }
+
+
+W endpoint logowania:
+
+weź email
+
+sprawdź, czy jest blockedUntil > Date.now() → zwróć błąd “Spróbuj później”.
+
+Jeśli hasło błędne:
+
+zwiększ count
+
+jeśli count >= 5 ustaw blockedUntil = Date.now() + 60*1000 (1 minuta)
+
+Jeśli logowanie poprawne:
+
+wyczyść licznik (delete attempts[email])
+
+✅ Oddanie: screen: 5 błędnych prób → blokada → po minucie znowu można.
+
+ZADANIE 5 (na 6.0) – Testy EASY = 3 testy API (supertest)
+Szkielet (o co chodzi)
+
+Na 6.0 robisz rzecz “pro” dla IT: automatyczne testy backendu.
+Wersja EASY:
+
+robisz tylko 3 testy API:
+
+rejestracja działa
+
+logowanie działa
+
+dodanie wpisu działa
+
+Wykonanie (krok po kroku)
+
+Wejdź do backendu i doinstaluj paczki:
+
+npm i -D jest supertest
+
+W package.json backendu dodaj skrypt:
+
+"scripts": {
+  "test": "jest"
+}
+
+
+Utwórz folder:
+
+backend/tests/
+
+Utwórz plik:
+
+backend/tests/api.test.js
+
+Napisz 3 proste testy:
+
+rejestracja: POST /register → status 200/201
+
+logowanie: POST /login → status 200 i zwraca token
+
+dodanie wpisu: POST /entries → status 200/201
+
+Jeśli backend nie eksportuje app, może być potrzebna mała zmiana: zamiast app.listen() w server.js, eksportujesz app i osobno uruchamiasz serwer. (To jest normalne w testach.)
+
+Uruchom testy:
+
+npm test
+
+✅ Oddanie: screen z terminala z przejściem testów + plik api.test.js w repo.

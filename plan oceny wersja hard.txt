@@ -1,0 +1,271 @@
+PW Vault: HARD MODE – Projekt dla ambitnych
+
+Masz zrobić działającą aplikację do przechowywania haseł – ale w wersji, która nie wywoła śmiechu u juniora na stażu.
+
+📈 Plan ocen – poziomy wtajemniczenia (Cegiełki)
+
+Ocena 1 – Aplikacja działa lokalnie (docker-compose lub npm). Można się zalogować, dodać wpis.
+
+Ocena 2 – Projekt na GitHubie, czysto w repo (.gitignore, .env.example, README).
+
+Ocena 3 – Logowanie z prawdziwym 2FA (TOTP).
+
+Ocena 4 – Każdy użytkownik ma swój zaszyfrowany klucz, dane szyfrowane AES-GCM.
+
+Ocena 5 – Ochrona loginu: rate limit + lockout po błędach.
+
+Ocena 6 – Testy backendu + CI (GitHub Actions odpala testy automatycznie).
+
+🧱 OCENA 2 — Git + .gitignore + GitHub
+
+Minimalna podstawa, żeby projekt nie był żenujący.
+
+Zadbaj o pliki .env
+
+Nie wrzucasz ich do repo.
+
+Zamiast tego dodajesz .env.example z placeholderami.
+
+backend/.env.example
+
+PORT=5000
+MONGO_URI=mongodb://root:root@pw-mongo:27017/pw_vault?authSource=admin
+JWT_SECRET=CHANGE_ME
+MASTER_KEY_BASE64=CHANGE_ME
+
+
+frontend/.env.example
+
+VITE_API_URL=http://localhost:5000
+
+
+.gitignore (w katalogu głównym repo)
+
+# Node / JS
+node_modules/
+*.log
+
+# Vite / React
+dist/
+build/
+.vite/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+
+GitHub + README
+
+Inicjalizujesz repo, wrzucasz na GitHub.
+
+Dodajesz README.md z instrukcją:
+
+Wymagania
+
+Jak odpalić (docker compose up --build)
+
+Jak ustawić .env
+
+Jak wygenerować klucze:
+
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+🔐 OCENA 3 — 2FA (TOTP)
+
+Użytkownik włącza 2FA i loguje się kodem z Google Authenticator.
+
+Dodaj biblioteki
+
+npm i speakeasy qrcode
+
+
+Zmiany w modelu User
+
+twoFactorEnabled – czy 2FA jest aktywne
+
+twoFactorSecret – stały sekret TOTP
+
+twoFactorTempSecret – używany przy aktywacji
+
+Nowe endpointy:
+
+POST /2fa/start → generuje sekret i QR code (dataURL)
+
+POST /2fa/verify → użytkownik podaje kod, backend go weryfikuje
+
+Logowanie z 2FA
+
+Jeśli user ma 2FA → musi podać kod TOTP razem z loginem.
+
+Brak kodu = 401 “2FA required”.
+
+Frontend
+
+Panel "Security" po zalogowaniu: przycisk "Enable 2FA"
+
+Pokazujesz QR i input
+
+W loginie – jeśli backend żąda kodu 2FA, pokazujesz input
+
+🧠 OCENA 4 — Lepsze szyfrowanie (AES-GCM + klucz użytkownika)
+
+Każdy użytkownik ma własny klucz, zaszyfrowany masterem.
+
+W .env:
+
+MASTER_KEY_BASE64=...  // 32 bajty zakodowane base64
+
+
+Przy rejestracji użytkownika:
+
+Tworzysz losowy userKey (32 bajty)
+
+Szyfrujesz userKey masterowym kluczem
+
+Zapisujesz do usera:
+
+vaultKeyEnc, vaultKeyIv, vaultKeyTag
+
+Szyfrowanie wpisów vault
+
+JSON z danymi (title, login, url, itd.) → zamieniasz na payload
+
+Szyfrujesz payload userKeyem → zapisujesz do bazy:
+
+dataEnc, iv, tag
+
+Odczyt:
+
+Deszyfrujesz userKey z danych usera
+
+Potem deszyfrujesz wpisy
+
+Uwaga: Nie musisz szyfrować każdego pola osobno – cały JSON też jest OK.
+
+🔒 OCENA 5 — Rate limiting + lockout
+
+Zabezpieczenie przed spamem i atakami brute-force.
+
+Rate limiting (na IP)
+
+npm i express-rate-limit
+
+import rateLimit from "express-rate-limit";
+
+const limiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { message: "Too many login attempts" },
+});
+
+app.post("/auth/login", limiter, loginHandler);
+
+
+Lockout (na użytkownika)
+
+W modelu User:
+
+failedLoginAttempts
+
+lockUntil
+
+Przy loginie:
+
+Złe hasło → +1
+
+5 prób = lockUntil = teraz + 15min
+
+Udany login → reset liczników
+
+✅ OCENA 6 — Testy + CI (GitHub Actions)
+
+Tu wchodzisz do prawdziwego świata DevOps i QA.
+
+Zainstaluj testy
+
+npm i -D jest supertest mongodb-memory-server
+
+
+Struktura testów
+
+Folder backend/tests/
+
+Pliki testowe: auth.test.js, vault.test.js, itd.
+
+Importuj app z app.js (nie server.js – nie otwieraj portu)
+
+W testach ustaw process.env
+
+JWT_SECRET, MASTER_KEY_BASE64 – możesz dać stałe wartości
+
+Skrypt testowy w package.json
+
+"scripts": {
+  "test": "jest --runInBand"
+}
+
+
+CI: GitHub Actions
+
+Plik .github/workflows/ci.yml
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install backend deps
+        working-directory: backend
+        run: npm ci
+
+      - name: Run tests
+        working-directory: backend
+        env:
+          JWT_SECRET: test
+          MASTER_KEY_BASE64: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+        run: npm test
+
+
+Efekt:
+
+W repo na GitHubie → zakładka Actions → zielony ✅
+
+W README.md możesz dodać badge z status CI
+
+📝 Na koniec – oddajesz:
+
+Link do repo
+
+README z instrukcją
+
+Wszystkie zadania zrealizowane (albo wybrane poziomy)
+
+Zrzuty ekranów tam, gdzie wymagane
+
+Chcesz wyższą ocenę? Masz na to pełen wpływ.
+Każdy kolejny poziom zadania przybliża cię do umiejętności, które realnie przydają się w zawodzie.
+
+Ten projekt to nie test do zaliczenia – to okazja, żeby sprawdzić się w warunkach zbliżonych do pracy zespołu IT.
+Im więcej zrobisz, tym więcej wyniesiesz – zarówno na ocenę, jak i na przyszłość.
+
+🚀 Pokaż, że potrafisz tworzyć bezpieczne, przemyślane i profesjonalne aplikacje – to naprawdę się liczy.

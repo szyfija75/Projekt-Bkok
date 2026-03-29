@@ -5,7 +5,6 @@ export default function App() {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("test@example.com");
   const [password, setPassword] = useState("password123");
-  // 1. Dodano brakujący stan dla kodu 2FA
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [token, setTok] = useState(localStorage.getItem("token") || "");
 
